@@ -1,6 +1,6 @@
 vision_damage_analysis:
   simple: |
-    Describe the car damage you see in this image.
+    Describe the car damage in this image.
 
   intermediate: |
     Analyze this car damage image and provide:

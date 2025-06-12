@@ -1,0 +1,14 @@
+[project]
+name = "scout"
+version = "0.1.0"
+description = "An end-to-end car crash claim AI assistant powered by FireworksAI"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "gradio",
+    "fireworks-ai",
+    "pre-commit"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

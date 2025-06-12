@@ -22,4 +22,4 @@ clean:
 
 run:
 	@. .venv/bin/activate
-	python -m app.app
+	python -m src.app

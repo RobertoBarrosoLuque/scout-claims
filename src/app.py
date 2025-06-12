@@ -2,6 +2,8 @@ from pathlib import Path
 
 import gradio as gr
 
+from modules.image_analysis import pil_to_base64_dict, analyze_damage_image
+
 _FILE_PATH = Path(__file__).parents[1]
 
 
@@ -154,24 +156,38 @@ class ClaimsAssistantApp:
                     return (
                         "❌ Please upload an image first",
                         gr.update(visible=False),
-                        gr.update(visible=False),
                     )
 
-                # TODO Analyze damage
-                # self.damage_analysis = analyze_damage_image(image, api_key)
-
-                if "error" in self.damage_analysis:
+                if not api_key.strip():
                     return (
-                        f"❌ Error: {self.damage_analysis['error']}",
-                        gr.update(visible=False),
+                        "❌ Please enter your Fireworks AI API key first",
                         gr.update(visible=False),
                     )
 
-                return (
-                    "✅ Damage analysis completed successfully!",
-                    gr.update(value=self.damage_analysis, visible=True),
-                    gr.update(visible=True),
-                )
+                try:
+                    # Update status to show processing
+                    yield (
+                        "🔄 Analyzing damage... Please wait",
+                        gr.update(visible=False),
+                    )
+
+                    image_dict = pil_to_base64_dict(image)
+                    self.damage_analysis = analyze_damage_image(
+                        image=image_dict, api_key=api_key
+                    )
+
+                    yield (
+                        "✅ Damage analysis completed successfully!",
+                        gr.update(value=self.damage_analysis, visible=True),
+                    )
+                    return None
+
+                except Exception as e:
+                    yield (
+                        f"❌ Error analyzing damage: {str(e)}",
+                        gr.update(visible=False),
+                    )
+                    return None
 
             def handle_incident_processing(audio, api_key):
                 if audio is None:
@@ -179,31 +195,43 @@ class ClaimsAssistantApp:
                         "❌ Please record audio first",
                         gr.update(visible=False),
                         "No audio recorded",
-                        gr.update(visible=False),
                     )
 
-                # TODO Process incident
-                # self.incident_data = process_incident_description(None, audio, api_key)
-
-                if "error" in self.incident_data:
+                if not api_key.strip():
                     return (
-                        f"❌ Error: {self.incident_data['error']}",
+                        "❌ Please enter your Fireworks AI API key first",
+                        gr.update(visible=False),
+                        "API key required",
+                    )
+
+                try:
+                    # TODO: Implement incident processing
+                    # For now, return a placeholder
+                    self.incident_data = {
+                        "transcription": "Audio processing not yet implemented",
+                        "incident_type": "collision",
+                        "date": "2024-03-12",
+                        "location": "Main Street intersection",
+                        "parties_involved": 2,
+                        "fault_assessment": "pending",
+                        "weather_conditions": "clear",
+                    }
+
+                    transcription_text = self.incident_data.get(
+                        "transcription", "Audio transcribed successfully"
+                    )
+
+                    return (
+                        "✅ Incident processing completed successfully!",
+                        gr.update(value=self.incident_data, visible=True),
+                        transcription_text,
+                    )
+                except Exception as e:
+                    return (
+                        f"❌ Error processing incident: {str(e)}",
                         gr.update(visible=False),
                         "Error processing audio",
-                        gr.update(visible=False),
                     )
-
-                # Extract transcription from incident data for display
-                transcription_text = self.incident_data.get(
-                    "transcription", "Audio transcribed successfully"
-                )
-
-                return (
-                    "✅ Incident processing completed successfully!",
-                    gr.update(value=self.incident_data, visible=True),
-                    transcription_text,
-                    gr.update(visible=True),
-                )
 
             def handle_report_generation(api_key):
                 if not self.damage_analysis or not self.incident_data:
@@ -215,28 +243,53 @@ class ClaimsAssistantApp:
                         gr.update(open=False),
                     )
 
-                # TODO Generate report
-                # report = generate_claim_report(
-                #    self.damage_analysis, self.incident_data, api_key
-                # )
+                if not api_key.strip():
+                    return (
+                        "❌ Please enter your Fireworks AI API key first",
+                        "Report will appear here after generation",
+                        gr.update(visible=False),
+                        gr.update(visible=False),
+                        gr.update(open=False),
+                    )
 
-                # if report.startswith("Error:"):
-                #     return (
-                #         report,
-                #         "Report will appear here after generation",
-                #         gr.update(visible=False),
-                #         gr.update(visible=False),
-                #         gr.update(open=False),
-                #     )
-                report = None
+                try:
+                    # TODO: Implement report generation
+                    # For now, create a sample report
+                    report = f"""
+                            # Insurance Claim Report
 
-                return (
-                    "✅ Claim report generated successfully!",
-                    report,
-                    gr.update(visible=True),
-                    gr.update(visible=True),
-                    gr.update(open=True),
-                )
+                            ## Damage Analysis Summary
+                            - **Description**: {self.damage_analysis.get('description', 'N/A')}
+                            - **Location**: {self.damage_analysis.get('location', 'N/A')}
+                            - **Severity**: {self.damage_analysis.get('severity', 'N/A')}
+
+                            ## Incident Summary
+                            - **Date**: {self.incident_data.get('date', 'N/A')}
+                            - **Location**: {self.incident_data.get('location', 'N/A')}
+                            - **Parties Involved**: {self.incident_data.get('parties_involved', 'N/A')}
+                            - **Weather Conditions**: {self.incident_data.get('weather_conditions', 'N/A')}
+
+                            ## Recommendations
+                            Based on the analysis, this claim appears to be valid and requires further inspection by a qualified adjuster.
+
+                            **Claim Reference**: CLM-2024-0312-001
+                    """
+
+                    return (
+                        "✅ Claim report generated successfully!",
+                        report,
+                        gr.update(visible=True),
+                        gr.update(visible=True),
+                        gr.update(open=True),
+                    )
+                except Exception as e:
+                    return (
+                        f"❌ Error generating report: {str(e)}",
+                        "Report will appear here after generation",
+                        gr.update(visible=False),
+                        gr.update(visible=False),
+                        gr.update(open=False),
+                    )
 
             def handle_claim_submission():
                 return "🎉 Claim submitted successfully! Reference #: CLM-2024-0312-001"
@@ -245,7 +298,7 @@ class ClaimsAssistantApp:
             analyze_btn.click(
                 fn=handle_damage_analysis,
                 inputs=[image_input, api_key],
-                outputs=[damage_status, damage_results, damage_results],
+                outputs=[damage_status, damage_results],
             )
 
             process_incident_btn.click(
@@ -254,7 +307,6 @@ class ClaimsAssistantApp:
                 outputs=[
                     incident_status,
                     incident_results,
-                    transcription_display,
                     transcription_display,
                 ],
             )

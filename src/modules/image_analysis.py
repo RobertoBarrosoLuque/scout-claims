@@ -9,11 +9,14 @@ from PIL import Image
 import io
 import base64
 
-_LLM = LLM(
-    model=APP_STEPS_CONFIGS.analyze_damage_image.model,
-    temperature=APP_STEPS_CONFIGS.analyze_damage_image.temperature,
-    deployment_type="serverless",
-)
+
+def get_llm(api_key: str) -> LLM:
+    return LLM(
+        model=APP_STEPS_CONFIGS.analyze_damage_image.model,
+        temperature=APP_STEPS_CONFIGS.analyze_damage_image.temperature,
+        deployment_type="serverless",
+        api_key=api_key,
+    )
 
 
 class IncidentAnalysis(BaseModel):
@@ -54,7 +57,22 @@ def load_image_from_path(file_path: str | Path) -> dict:
     return {"image": img, "path": str(file_path), "base64": img_base64}
 
 
-def analyze_damage_image(image, prompt: str = "advanced"):
+def pil_to_base64_dict(pil_image):
+    """Convert PIL image to the format expected by analyze_damage_image"""
+    if pil_image is None:
+        return None
+
+    buffered = io.BytesIO()
+    if pil_image.mode != "RGB":
+        pil_image = pil_image.convert("RGB")
+
+    pil_image.save(buffered, format="JPEG")
+    img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+    return {"image": pil_image, "path": "uploaded_image.jpg", "base64": img_base64}
+
+
+def analyze_damage_image(image, api_key: str, prompt: str = "advanced"):
     """
     Analyze the damage in an image using the Fireworks VLM model.
     """
@@ -64,7 +82,8 @@ def analyze_damage_image(image, prompt: str = "advanced"):
 
     prompt_text = PROMPT_LIBRARY["vision_damage_analysis"][prompt]
 
-    response = _LLM.chat.completions.create(
+    llm = get_llm(api_key=api_key)
+    response = llm.chat.completions.create(
         messages=[
             {
                 "role": "user",

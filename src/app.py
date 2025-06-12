@@ -48,7 +48,7 @@ class ClaimsAssistantApp:
                     gr.Markdown(
                         """
                     **Step 1:** Upload car damage photo(s)
-                    **Step 2:** Record incident description
+                    **Step 2:** Describe incident
                     **Step 3:** Generate and review claim report
 
                     *All processing happens automatically via FireworksAI*
@@ -83,7 +83,7 @@ class ClaimsAssistantApp:
                     gr.Markdown("---")
 
                     # Step 2: Incident Description
-                    gr.Markdown("## 🎤 Step 2: Record Incident Description 🎤")
+                    gr.Markdown("## 🎤 Step 2: Describe the Incident 🎤")
 
                     with gr.Row():
                         with gr.Column():

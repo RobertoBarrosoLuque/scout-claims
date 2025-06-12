@@ -1,3 +1,4 @@
+import json
 from typing import Literal
 
 from fireworks.llm import LLM
@@ -36,9 +37,9 @@ def load_image_from_path(file_path: str | Path) -> dict:
             }
     """
     supported_formats = {
-        "jpg": "JPEG",
-        "jpeg": "JPEG",
-        "png": "PNG",
+        ".jpg": "JPEG",
+        ".jpeg": "JPEG",
+        ".png": "PNG",
     }
     if file_path.suffix not in supported_formats:
         raise ValueError(f"Unsupported image format: {file_path.suffix}")
@@ -60,14 +61,29 @@ def analyze_damage_image(image, prompt: str = "advanced"):
     assert (
         prompt in PROMPT_LIBRARY["vision_damage_analysis"].keys()
     ), f"Invalid prompt choose from {list(PROMPT_LIBRARY['vision_damage_analysis'].keys())}"
-    prompt = PROMPT_LIBRARY["vision_damage_analysis"][prompt]
-    return _LLM.chat.completions(
+
+    prompt_text = PROMPT_LIBRARY["vision_damage_analysis"][prompt]
+
+    response = _LLM.chat.completions.create(
         messages=[
-            {"role": "user", "content": prompt},
-            {"role": "user", "content": image["base64"]},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image['base64']}"
+                        },
+                    },
+                    {"type": "text", "text": prompt_text},
+                ],
+            }
         ],
         response_format={
             "type": "json_object",
             "schema": IncidentAnalysis.model_json_schema(),
         },
     )
+
+    result = json.loads(response.choices[0].message.content)
+    return result

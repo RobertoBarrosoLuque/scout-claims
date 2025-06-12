@@ -3,6 +3,8 @@ from pathlib import Path
 from typing import Any
 import yaml
 
+from configs.config_models import StepModelsConfigs
+
 
 @lru_cache
 def load_config(config_path: Path, _format: str = "dict") -> dict[str, Any] | str:
@@ -31,4 +33,19 @@ def load_config(config_path: Path, _format: str = "dict") -> dict[str, Any] | st
         return content
 
 
-PROMPT_LIBRARY = load_config(Path(__file__).parent / "prompt_library.yml")
+def load_module_config(config_path, config_model=None):
+    """
+    Load a YAML configuration file and validate against a Pydantic model.
+    """
+    config_data = load_config(config_path)
+
+    if config_model:
+        return config_model(**config_data)
+
+    return config_data
+
+
+PROMPT_LIBRARY = load_config(Path(__file__).parent / "prompt_library.yaml")
+APP_STEPS_CONFIGS = load_module_config(
+    Path(__file__).parent / "config.yaml", StepModelsConfigs
+)

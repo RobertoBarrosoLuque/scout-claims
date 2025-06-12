@@ -1,0 +1,11 @@
+analyze_damage_image:
+  model: "accounts/fireworks/models/qwen2p5-vl-32b-instruct"
+  temperature: 0.0
+
+incident_response:
+  model: "accounts/fireworks/models/qwen3-235b-a22b"
+  temperature: 0.0
+
+report_generation:
+  model: "accounts/fireworks/models/deepseek-r1-0528"
+  temperature: 0.0

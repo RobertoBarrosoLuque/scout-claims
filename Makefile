@@ -2,9 +2,9 @@
 
 setup:
 	@echo "Setting up local environment..."
-	@../scripts/install_uv.sh
+	@scripts/install_uv.sh
 	@uv python install 3.11
-	@../scripts/create_venv.sh
+	@scripts/create_venv.sh
 	@. .venv/bin/activate && make install
 
 install:

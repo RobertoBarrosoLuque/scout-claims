@@ -1,0 +1,52 @@
+vision_damage_analysis:
+  simple: |
+    Describe the car damage you see in this image.
+
+  intermediate: |
+    Analyze this car damage image and provide:
+
+    1. What type of damage do you see?
+    2. How severe is the damage?
+    3. Which parts of the car are affected?
+    4. Estimate if this is minor, moderate, or major damage.
+
+    Please be specific and detailed in your response.
+
+  advanced: |
+    You are an expert automotive claims adjuster analyzing vehicle damage. Examine this image carefully and provide a comprehensive damage assessment.
+
+    **ANALYSIS REQUIREMENTS:**
+    Analyze the image systematically and return your findings in the following JSON format:
+
+    ```json
+    {
+      "damage_description": "Detailed description of visible damage",
+      "damage_types": ["scratch", "dent", "crack", "break", "missing_part"],
+      "severity_level": "minor|moderate|major",
+      "affected_sections": ["front_bumper", "rear_bumper", "driver_door", "passenger_door", "hood", "trunk", "roof", "windshield", "headlight", "taillight", "wheel", "mirror"],
+      "estimated_repair_complexity": "simple|moderate|complex",
+      "safety_concerns": "Description of any safety-related damage",
+      "additional_notes": "Any other relevant observations"
+    }
+    ```
+
+    **SEVERITY DEFINITIONS:**
+    - **Minor**: Cosmetic damage, scratches, small dents < 2 inches
+    - **Moderate**: Noticeable damage affecting function, dents 2-6 inches, cracked lights
+    - **Major**: Structural damage, large dents > 6 inches, safety systems affected
+
+    **SECTION DEFINITIONS:**
+    - Front: front_bumper, hood, headlight, windshield
+    - Sides: driver_door, passenger_door, wheel, mirror
+    - Rear: rear_bumper, trunk, taillight
+
+    **INSTRUCTIONS:**
+    1. Examine the entire visible vehicle surface
+    2. Identify all damage types present
+    3. Assess severity based on size, depth, and functional impact
+    4. List ALL affected sections visible in the image
+    5. Consider safety implications (airbag deployment areas, structural integrity)
+    6. Be conservative in estimates - when uncertain, classify as higher severity
+    7. Return ONLY valid JSON - no additional text
+
+    Focus on accuracy and consistency. This analysis will be used for insurance claim processing.

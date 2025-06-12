@@ -131,7 +131,6 @@ class ClaimsAssistantApp:
                         interactive=False,
                         lines=2,
                     )
-
                     # Final Report Display
                     with gr.Accordion(
                         "📋 Generated Claim Report", open=False
@@ -158,7 +157,8 @@ class ClaimsAssistantApp:
                         gr.update(visible=False),
                     )
 
-                self.damage_analysis = analyze_damage_image(image, api_key)
+                # TODO Analyze damage
+                # self.damage_analysis = analyze_damage_image(image, api_key)
 
                 if "error" in self.damage_analysis:
                     return (
@@ -182,7 +182,8 @@ class ClaimsAssistantApp:
                         gr.update(visible=False),
                     )
 
-                self.incident_data = process_incident_description(None, audio, api_key)
+                # TODO Process incident
+                # self.incident_data = process_incident_description(None, audio, api_key)
 
                 if "error" in self.incident_data:
                     return (
@@ -214,18 +215,20 @@ class ClaimsAssistantApp:
                         gr.update(open=False),
                     )
 
-                report = generate_claim_report(
-                    self.damage_analysis, self.incident_data, api_key
-                )
+                # TODO Generate report
+                # report = generate_claim_report(
+                #    self.damage_analysis, self.incident_data, api_key
+                # )
 
-                if report.startswith("Error:"):
-                    return (
-                        report,
-                        "Report will appear here after generation",
-                        gr.update(visible=False),
-                        gr.update(visible=False),
-                        gr.update(open=False),
-                    )
+                # if report.startswith("Error:"):
+                #     return (
+                #         report,
+                #         "Report will appear here after generation",
+                #         gr.update(visible=False),
+                #         gr.update(visible=False),
+                #         gr.update(open=False),
+                #     )
+                report = None
 
                 return (
                     "✅ Claim report generated successfully!",

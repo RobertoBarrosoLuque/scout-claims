@@ -7,6 +7,7 @@ import numpy as np
 
 from modules.image_analysis import pil_to_base64_dict, analyze_damage_image
 from modules.transcription import FireworksTranscription
+from modules.incident_processing import process_transcript_description
 
 _FILE_PATH = Path(__file__).parents[1]
 
@@ -332,19 +333,13 @@ class ClaimsAssistantApp:
                         gr.update(visible=False),
                     )
 
-                    # TODO: Use Fireworks to process the transcription and extract structured data
-                    # For now, we'll create a placeholder structure with the actual transcription
-                    self.incident_data = {
-                        "transcription": self.live_transcription,
-                        "incident_type": "collision",  # Could be extracted from transcription
-                        "date": time.strftime("%Y-%m-%d"),
-                        "location": "Location extracted from speech",  # Could be extracted
-                        "parties_involved": 2,  # Could be counted from transcription
-                        "fault_assessment": "pending",
-                        "weather_conditions": "clear",  # Could be extracted
-                        "injuries_reported": False,  # Could be extracted
-                        "vehicle_description": "Vehicle details from speech",  # Could be extracted
-                    }
+                    # Use Fireworks to process the transcription and extract structured data
+                    incident_analysis = process_transcript_description(
+                        transcript=self.live_transcription, api_key=api_key
+                    )
+
+                    # Convert Pydantic model to dict for JSON display
+                    self.incident_data = incident_analysis.model_dump()
 
                     yield (
                         "✅ Incident processing completed successfully!",

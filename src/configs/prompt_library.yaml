@@ -35,3 +35,47 @@ vision_damage_analysis:
     6. Be conservative in estimates - when uncertain, classify as higher severity
 
     Focus on accuracy and consistency. This analysis will be used for insurance claim processing.
+
+
+incident_processing:
+  simple: |
+    Analyze this transcript of an car crash incident
+
+  intermediate: |
+    Analyze this transcript of an car crash incident and provide:
+
+    1. When and where
+    2. What happened
+    3. Who was involved
+    4. What was the severity
+
+  advanced: |
+    You are an expert automotive claims adjuster analyzing vehicle damage. You have been provided a transcript of an incident and you need to provide a detailed analysis of the incident.
+
+    **INSTRUCTIONS:**
+    1. Analyze the entire transcript
+    2. Indentify when and where the incident occurred
+    3. Identify who was involved
+    5. Identify what exact events took place
+    6. Identify the severity of the incident - to both the car and people
+    7. Be specific and detailed in your response
+
+    If any of the above information is unclear or not provided in the transcript, do not make any thing up. Instead just
+    say "No information provided in the transcript"
+
+    **Example transcript:**
+    <transcript>
+    Yeah so I was driving down the road and I hit a car and I was hurt. This happened today around 3pm
+    the other car involved was a VW sedan driven by a guy called John Doe. It was a pretty minor crash so just
+    a couple of scratchs on the driver side and a few dents on the passenger side. No on was hurt.
+    </transcript>
+
+    **Example response:**
+    <response>
+    When: around 3pm today
+    Where: on the road
+    What happened: I was driving down the road and I hit a car
+    Who was involved: VW sedan driven by a guy called John Doe
+    What was the severity: It was a pretty minor crash so just a couple of scratchs on the driver side and a few dents on the passenger side
+    Was anyone hurt: No one was hurt
+    </response>

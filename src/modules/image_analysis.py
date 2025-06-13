@@ -10,19 +10,19 @@ import io
 import base64
 
 
-def get_llm(api_key: str) -> LLM:
-    return LLM(
-        model=APP_STEPS_CONFIGS.analyze_damage_image.model,
-        temperature=APP_STEPS_CONFIGS.analyze_damage_image.temperature,
-        deployment_type="serverless",
-        api_key=api_key,
-    )
-
-
 class IncidentAnalysis(BaseModel):
     description: str
     location: Literal["front-left", "front-right", "back-left", "back-right"]
     severity: Literal["minor", "moderate", "major"]
+
+
+def get_llm(api_key: str, model: str, temperature: float) -> LLM:
+    return LLM(
+        model=model,
+        temperature=temperature,
+        deployment_type="serverless",
+        api_key=api_key,
+    )
 
 
 def load_image_from_path(file_path: str | Path) -> dict:
@@ -82,7 +82,11 @@ def analyze_damage_image(image, api_key: str, prompt: str = "advanced"):
 
     prompt_text = PROMPT_LIBRARY["vision_damage_analysis"][prompt]
 
-    llm = get_llm(api_key=api_key)
+    llm = get_llm(
+        api_key=api_key,
+        model=APP_STEPS_CONFIGS.analyze_damage_image.model,
+        temperature=APP_STEPS_CONFIGS.analyze_damage_image.temperature,
+    )
     response = llm.chat.completions.create(
         messages=[
             {

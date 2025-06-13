@@ -7,5 +7,5 @@ incident_response:
   temperature: 0.0
 
 report_generation:
-  model: "accounts/fireworks/models/deepseek-r1-0528"
+  model: "accounts/fireworks/models/deepseek-v3-0324"
   temperature: 0.0

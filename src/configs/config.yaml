@@ -3,7 +3,7 @@ analyze_damage_image:
   temperature: 0.0
 
 incident_response:
-  model: "accounts/fireworks/models/qwen3-235b-a22b"
+  model: "accounts/fireworks/models/llama4-scout-instruct-basic"
   temperature: 0.0
 
 report_generation:

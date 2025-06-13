@@ -13,25 +13,24 @@ class DateLocation(BaseModel):
 class PartiesInvolved(BaseModel):
     other_driver_name: Optional[str] = None
     other_driver_vehicle: Optional[str] = None
-    other_driver_contact_or_insurance: Optional[str] = None
     witnesses: Optional[str] = None
 
 
 class FaultAssessment(BaseModel):
-    who_at_fault: Optional[Literal["me", "other_driver", "both", "unclear"]] = None
-    reason: Optional[str] = None
+    who_at_fault: Literal["me", "other_driver", "unclear"]
+    reason: str
 
 
 class IncidentDescription(BaseModel):
-    what_happened: Optional[str] = None
-    damage_severity: Optional[Literal["minor", "moderate", "severe"]] = None
+    what_happened: str
+    damage_severity: Literal["minor", "moderate", "severe", "unclear"]
 
 
 class InjuriesMedical(BaseModel):
-    anyone_injured: Optional[Literal["yes", "no", "unknown"]] = None
+    anyone_injured: Literal["yes", "no", "unknown"]
     injury_details: Optional[str] = None
-    medical_attention: Optional[Literal["none", "scene", "hospital", "ongoing"]] = None
-    injury_severity: Optional[Literal["none", "minor", "moderate", "severe"]] = None
+    medical_attention: Optional[str] = None
+    injury_severity: Optional[Literal["none", "minor", "moderate", "severe", "unclear"]]
 
 
 class IncidentAnalysis(BaseModel):
@@ -53,9 +52,10 @@ def process_transcript_description(transcript: str, api_key: str):
     Returns:
         incident_description: incident description
     """
+    print("Starting incident analysis...")
     llm = get_llm(
         api_key=api_key,
-        model=APP_STEPS_CONFIGS.incident_response.model,
+        model="accounts/fireworks/models/llama4-scout-instruct-basic",
         temperature=APP_STEPS_CONFIGS.incident_response.temperature,
     )
 
@@ -74,9 +74,7 @@ def process_transcript_description(transcript: str, api_key: str):
         messages=[
             {
                 "role": "system",
-                "content": "You are an expert automotive claims adjuster. "
-                "Analyze the provided transcript and extract structured information for "
-                "insurance claim processing.",
+                "content": "You are an expert automotive claims adjuster analyzing vehicle damage.",
             },
             {"role": "user", "content": full_prompt},
         ],
@@ -90,5 +88,5 @@ def process_transcript_description(transcript: str, api_key: str):
     incident_data = IncidentAnalysis.model_validate_json(
         response.choices[0].message.content
     )
-
+    print("Finished incident analysis.")
     return incident_data

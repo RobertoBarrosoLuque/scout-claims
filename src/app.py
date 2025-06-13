@@ -2,9 +2,11 @@ from pathlib import Path
 import gradio as gr
 import threading
 import time
+import queue
+import numpy as np
 
 from modules.image_analysis import pil_to_base64_dict, analyze_damage_image
-from modules.transcription import transcribe_audio_with_fireworks
+from modules.transcription import FireworksTranscription
 
 _FILE_PATH = Path(__file__).parents[1]
 
@@ -15,6 +17,9 @@ class ClaimsAssistantApp:
         self.incident_data = None
         self.live_transcription = ""
         self.transcription_lock = threading.Lock()
+        self.is_recording = False
+        self.transcription_service = None
+        self.audio_queue = queue.Queue()
 
     def create_interface(self):
         """Create the main Gradio interface"""
@@ -53,7 +58,7 @@ class ClaimsAssistantApp:
                     gr.Markdown(
                         """
                     **Step 1:** Upload car damage photo(s)
-                    **Step 2:** Describe incident (record audio)
+                    **Step 2:** Use microphone to describe incident
                     **Step 3:** Generate and review claim report
 
                     *All processing happens automatically via FireworksAI*
@@ -87,24 +92,53 @@ class ClaimsAssistantApp:
 
                     gr.Markdown("---")
 
-                    # Step 2: Incident Description
+                    # Step 2: Incident Description with Live Streaming
                     gr.Markdown("## 🎤 Step 2: Describe the Incident 🎤")
 
+                    with gr.Accordion(
+                        "💡 What to Include in Your Recording", open=True
+                    ):
+                        gr.Markdown(
+                            """
+                        **Please describe the following when you record:**
+
+                        📅 **When & Where:**
+                        - Date and time of the accident
+                        - Street address or intersection
+
+                        👥 **Who Was Involved:**
+                        - Other driver's name and contact info
+                        - Vehicle details (make, model, color, license plate)
+                        - Any witnesses
+
+                        🚗 **What Happened:**
+                        - How the accident occurred
+                        - Who was at fault and why
+                        - Weather and road conditions
+
+                        🏥 **Injuries & Damage:**
+                        - Anyone hurt? How seriously?
+                        - How severe is the vehicle damage?
+
+                        """
+                        )
+
                     with gr.Row():
+                        # Direct audio input - no toggle button needed
                         with gr.Column():
-                            gr.Markdown("### Record Audio")
                             audio_input = gr.Audio(
-                                label="Record Incident Description",
-                                type="filepath",
+                                label="🎵 Record Incident Description",
                                 sources=["microphone"],
+                                streaming=True,
+                                format="wav",
+                                show_download_button=False,
                             )
-                        with gr.Column():
-                            gr.Markdown("### Live Transcription")
                             transcription_display = gr.Textbox(
                                 label="Live Transcription",
-                                placeholder="Audio transcription will appear here as you speak...",
-                                lines=6,
+                                placeholder="Click the 'Record' button above to start recording...",
+                                lines=8,
                                 interactive=False,
+                                autoscroll=True,
                             )
 
                     process_incident_btn = gr.Button(
@@ -113,7 +147,7 @@ class ClaimsAssistantApp:
 
                     incident_status = gr.Textbox(
                         label="Processing Status",
-                        value="Ready to process incident",
+                        value="Record audio first to process incident",
                         interactive=False,
                         lines=2,
                     )
@@ -186,71 +220,135 @@ class ClaimsAssistantApp:
                         "✅ Damage analysis completed successfully!",
                         gr.update(value=self.damage_analysis, visible=True),
                     )
+                    return None
 
                 except Exception as e:
                     yield (
                         f"❌ Error analyzing damage: {str(e)}",
                         gr.update(visible=False),
                     )
+                    return None
 
             def live_transcription_callback(text):
                 """Callback for live transcription updates"""
                 with self.transcription_lock:
                     self.live_transcription = text
 
-            def update_transcription_display():
-                """Periodically update the transcription display"""
+            def initialize_transcription_service(api_key):
+                """Initialize transcription service when audio starts"""
+                if not api_key.strip():
+                    return False
+
+                if not self.transcription_service:
+                    self.transcription_service = FireworksTranscription(api_key)
+                    self.transcription_service.set_callback(live_transcription_callback)
+
+                if not self.is_recording:
+                    self.is_recording = True
+                    self.live_transcription = ""
+                    return self.transcription_service._connect()
+                return True
+
+            def process_audio_stream(audio_tuple, api_key):
+                """Process incoming audio stream for live transcription"""
+                if not audio_tuple:
+                    with self.transcription_lock:
+                        return self.live_transcription
+
+                # Initialize transcription service if needed
+                if not self.is_recording:
+                    if not initialize_transcription_service(api_key):
+                        return "❌ Failed to initialize transcription service. Check your API key."
+
+                try:
+                    sample_rate, audio_data = audio_tuple
+
+                    # Convert audio data to proper format
+                    if not isinstance(audio_data, np.ndarray):
+                        audio_data = np.array(audio_data, dtype=np.float32)
+
+                    if audio_data.dtype != np.float32:
+                        if audio_data.dtype == np.int16:
+                            audio_data = audio_data.astype(np.float32) / 32768.0
+                        elif audio_data.dtype == np.int32:
+                            audio_data = audio_data.astype(np.float32) / 2147483648.0
+                        else:
+                            audio_data = audio_data.astype(np.float32)
+
+                    # Skip if audio is too quiet
+                    if np.max(np.abs(audio_data)) < 0.01:
+                        with self.transcription_lock:
+                            return self.live_transcription
+
+                    # Convert to mono if stereo
+                    if len(audio_data.shape) > 1:
+                        audio_data = np.mean(audio_data, axis=1)
+
+                    # Resample to 16kHz if needed
+                    if sample_rate != 16000:
+                        ratio = 16000 / sample_rate
+                        new_length = int(len(audio_data) * ratio)
+                        if new_length > 0:
+                            audio_data = np.interp(
+                                np.linspace(0, len(audio_data) - 1, new_length),
+                                np.arange(len(audio_data)),
+                                audio_data,
+                            )
+
+                    # Convert to bytes and send to transcription service
+                    audio_bytes = (audio_data * 32767).astype(np.int16).tobytes()
+
+                    if (
+                        self.transcription_service
+                        and self.transcription_service.is_connected
+                    ):
+                        self.transcription_service._send_audio_chunk(audio_bytes)
+
+                except Exception as e:
+                    print(f"Error processing audio stream: {e}")
+
+                # Return current transcription
                 with self.transcription_lock:
                     return self.live_transcription
 
-            def handle_incident_processing(audio, api_key):
-                if audio is None:
+            def handle_incident_processing(api_key):
+                """Process the recorded transcription into structured incident data"""
+                if not self.live_transcription.strip():
                     return (
-                        "❌ Please record audio first",
+                        "❌ No transcription available. Please record audio first.",
                         gr.update(visible=False),
-                        "No audio recorded",
                     )
 
                 if not api_key.strip():
                     return (
                         "❌ Please enter your Fireworks AI API key first",
                         gr.update(visible=False),
-                        "API key required",
                     )
 
                 try:
                     # Update status
                     yield (
-                        "🔄 Transcribing audio... Please wait",
+                        "🔄 Processing incident data... Please wait",
                         gr.update(visible=False),
-                        "Processing audio...",
                     )
 
-                    # Transcribe audio using Fireworks
-                    final_transcription = transcribe_audio_with_fireworks(
-                        audio_file_path=audio,
-                        api_key=api_key,
-                        live_callback=live_transcription_callback,
-                    )
-
-                    # TODO: Process the transcription to extract structured incident data
-                    # For now, we'll create a placeholder structure
+                    # TODO: Use Fireworks to process the transcription and extract structured data
+                    # For now, we'll create a placeholder structure with the actual transcription
                     self.incident_data = {
-                        "transcription": final_transcription,
+                        "transcription": self.live_transcription,
                         "incident_type": "collision",  # Could be extracted from transcription
-                        "date": "2024-03-12",  # Could be extracted from transcription
-                        "location": "Main Street intersection",  # Could be extracted
+                        "date": time.strftime("%Y-%m-%d"),
+                        "location": "Location extracted from speech",  # Could be extracted
                         "parties_involved": 2,  # Could be counted from transcription
                         "fault_assessment": "pending",
                         "weather_conditions": "clear",  # Could be extracted
                         "injuries_reported": False,  # Could be extracted
-                        "vehicle_description": "Sedan",  # Could be extracted
+                        "vehicle_description": "Vehicle details from speech",  # Could be extracted
                     }
 
                     yield (
                         "✅ Incident processing completed successfully!",
                         gr.update(value=self.incident_data, visible=True),
-                        final_transcription,
                     )
                     return None
 
@@ -258,7 +356,6 @@ class ClaimsAssistantApp:
                     yield (
                         f"❌ Error processing incident: {str(e)}",
                         gr.update(visible=False),
-                        "Error processing audio",
                     )
                     return None
 
@@ -287,54 +384,54 @@ class ClaimsAssistantApp:
                     transcription = self.incident_data.get("transcription", "N/A")
 
                     report = f"""
-                            # Insurance Claim Report
+                        # Insurance Claim Report
 
-                            **Claim Reference**: CLM-2024-{int(time.time())}-001
-                            **Date Generated**: {time.strftime("%Y-%m-%d %H:%M:%S")}
+                        **Claim Reference**: CLM-2024-{int(time.time())}-001
+                        **Date Generated**: {time.strftime("%Y-%m-%d %H:%M:%S")}
 
-                            ---
+                        ---
 
-                            ## 🚗 Damage Analysis Summary
+                        ## 🚗 Damage Analysis Summary
 
-                            - **Damage Type**: {self.damage_analysis.get('damage_type', 'N/A')}
-                            - **Severity Level**: {self.damage_analysis.get('severity', 'N/A')}
-                            - **Affected Areas**: {self.damage_analysis.get('affected_parts', 'N/A')}
-                            - **Estimated Repair Cost**: {self.damage_analysis.get('estimated_cost', 'N/A')}
-                            - **Additional Notes**: {self.damage_analysis.get('description', 'N/A')}
+                        - **Damage Type**: {self.damage_analysis.get('damage_type', 'N/A')}
+                        - **Severity Level**: {self.damage_analysis.get('severity', 'N/A')}
+                        - **Affected Areas**: {self.damage_analysis.get('affected_parts', 'N/A')}
+                        - **Estimated Repair Cost**: {self.damage_analysis.get('estimated_cost', 'N/A')}
+                        - **Additional Notes**: {self.damage_analysis.get('description', 'N/A')}
 
-                            ---
+                        ---
 
-                            ## 📝 Incident Summary
+                        ## 📝 Incident Summary
 
-                            - **Incident Date**: {self.incident_data.get('date', 'N/A')}
-                            - **Location**: {self.incident_data.get('location', 'N/A')}
-                            - **Incident Type**: {self.incident_data.get('incident_type', 'N/A')}
-                            - **Parties Involved**: {self.incident_data.get('parties_involved', 'N/A')}
-                            - **Weather Conditions**: {self.incident_data.get('weather_conditions', 'N/A')}
-                            - **Injuries Reported**: {"Yes" if self.incident_data.get('injuries_reported') else "No"}
+                        - **Incident Date**: {self.incident_data.get('date', 'N/A')}
+                        - **Location**: {self.incident_data.get('location', 'N/A')}
+                        - **Incident Type**: {self.incident_data.get('incident_type', 'N/A')}
+                        - **Parties Involved**: {self.incident_data.get('parties_involved', 'N/A')}
+                        - **Weather Conditions**: {self.incident_data.get('weather_conditions', 'N/A')}
+                        - **Injuries Reported**: {"Yes" if self.incident_data.get('injuries_reported') else "No"}
 
-                            ### Incident Description (Transcribed)
-                            *"{transcription[:500]}{'...' if len(transcription) > 500 else ''}"*
+                        ### Incident Description (Live Transcription)
+                        *"{transcription[:500]}{'...' if len(transcription) > 500 else ''}"*
 
-                            ---
+                        ---
 
-                            ## 🔍 Assessment & Recommendations
+                        ## 🔍 Assessment & Recommendations
 
-                            Based on the automated analysis of the damage photos and incident description:
+                        Based on the automated analysis of the damage photos and incident description:
 
-                            1. **Damage Assessment**: The vehicle shows {self.damage_analysis.get('severity', 'moderate')} damage
-                            2. **Claim Validity**: Initial assessment suggests this is a legitimate claim
-                            3. **Next Steps**:
-                               - Physical inspection recommended
-                               - Obtain additional documentation if needed
-                               - Process for repair authorization
+                        1. **Damage Assessment**: The vehicle shows {self.damage_analysis.get('severity', 'moderate')} damage
+                        2. **Claim Validity**: Initial assessment suggests this is a legitimate claim
+                        3. **Next Steps**:
+                           - Physical inspection recommended
+                           - Obtain additional documentation if needed
+                           - Process for repair authorization
 
-                            **Adjuster Notes**: This claim has been processed using AI assistance and requires human review for final approval.
+                        **Adjuster Notes**: This claim has been processed using AI assistance and requires human review for final approval.
 
-                            ---
+                        ---
 
-                            *This report was generated automatically using Fireworks AI technology*`
-                    """
+                        *This report was generated automatically using Fireworks AI technology*
+                        """
 
                     return (
                         "✅ Claim report generated successfully!",
@@ -363,14 +460,20 @@ class ClaimsAssistantApp:
                 outputs=[damage_status, damage_results],
             )
 
+            # Handle streaming audio for live transcription
+            audio_input.stream(
+                fn=process_audio_stream,
+                inputs=[audio_input, api_key],
+                outputs=[transcription_display],
+                time_limit=None,
+                stream_every=0.5,  # Update every 500ms
+                show_progress="hidden",
+            )
+
             process_incident_btn.click(
                 fn=handle_incident_processing,
-                inputs=[audio_input, api_key],
-                outputs=[
-                    incident_status,
-                    incident_results,
-                    transcription_display,
-                ],
+                inputs=[api_key],
+                outputs=[incident_status, incident_results],
             )
 
             generate_report_btn.click(
@@ -386,14 +489,6 @@ class ClaimsAssistantApp:
             )
 
             submit_btn.click(fn=handle_claim_submission, outputs=[report_status])
-
-            # Set up periodic updates for live transcription
-            # Note: This is a simplified approach - in production you'd want more sophisticated real-time updates
-            demo.load(
-                fn=update_transcription_display,
-                inputs=[],
-                outputs=[transcription_display],
-            )
 
         return demo
 

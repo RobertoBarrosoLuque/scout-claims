@@ -8,8 +8,10 @@ dependencies = [
     "gradio",
     "fireworks-ai",
     "pre-commit",
-    "websocket",
-    "soundfile"
+    "soundfile",
+    "scipy>=1.11.0",
+    "websocket-client",
+    "torchaudio",
 ]
 
 [tool.setuptools.packages.find]

@@ -217,27 +217,3 @@ class FireworksTranscription:
         """Get final transcription text."""
         with self.lock:
             return self._build_complete_text()
-
-
-def transcribe_audio_with_fireworks(
-    audio_file_path: str,
-    api_key: str,
-    live_callback: Optional[Callable[[str], None]] = None,
-) -> str:
-    """
-    Convenience function to transcribe audio file with Fireworks.
-
-    Args:
-        audio_file_path: Path to audio file
-        api_key: Fireworks API key
-        live_callback: Optional callback for live transcription updates
-
-    Returns:
-        Final transcription text
-    """
-    transcriber = FireworksTranscription(api_key)
-
-    if live_callback:
-        transcriber.set_callback(live_callback)
-
-    return transcriber.transcribe_audio_file(audio_file_path)

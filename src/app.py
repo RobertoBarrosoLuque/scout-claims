@@ -3,11 +3,14 @@ import gradio as gr
 import threading
 import queue
 import numpy as np
+import base64
+import tempfile
+import os
 
 from modules.image_analysis import pil_to_base64_dict, analyze_damage_image
 from modules.transcription import FireworksTranscription
 from modules.incident_processing import process_transcript_description
-from modules.claim_processing import generate_claim_report
+from modules.claim_processing import generate_claim_report_pdf
 
 _FILE_PATH = Path(__file__).parents[1]
 
@@ -21,8 +24,9 @@ class ClaimsAssistantApp:
         self.is_recording = False
         self.transcription_service = None
         self.audio_queue = queue.Queue()
-        self.final_report = ""
+        self.final_report_pdf = None
         self.claim_reference = ""
+        self.pdf_temp_path = None
 
     def create_interface(self):
         """Create the main Gradio interface"""
@@ -176,18 +180,19 @@ class ClaimsAssistantApp:
                         lines=2,
                     )
 
-                    # Final Report Display
+                    # Final Report Display - Updated for PDF
                     with gr.Accordion(
-                        "📋 Generated Claim Report", open=False
+                        "📋 Generated Claim Report (PDF)", open=False
                     ) as report_accordion:
-                        final_report = gr.Markdown(
-                            value="*Report will appear here after generation*",
-                            label="Claim Report",
+                        # PDF Viewer using HTML iframe
+                        pdf_viewer = gr.HTML(
+                            value="<p style='text-align: center; color: gray;'>PDF report will appear here after generation</p>",
+                            label="Claim Report PDF",
                         )
 
                         with gr.Row():
                             download_btn = gr.DownloadButton(
-                                "💾 Download Report", visible=False
+                                "💾 Download PDF Report", visible=False
                             )
                             submit_btn = gr.Button(
                                 "✅ Submit Claim", variant="stop", visible=False
@@ -357,11 +362,11 @@ class ClaimsAssistantApp:
                     return None
 
             def handle_report_generation(api_key):
-                """Generate comprehensive claim report using AI"""
+                """Generate comprehensive claim report as PDF using AI"""
                 if not self.damage_analysis or not self.incident_data:
                     return (
                         "❌ Please complete damage analysis and incident processing first",
-                        "Report will appear here after generation",
+                        "<p style='text-align: center; color: gray;'>PDF report will appear here after generation</p>",
                         gr.update(visible=False),
                         gr.update(visible=False),
                         gr.update(open=False),
@@ -370,7 +375,7 @@ class ClaimsAssistantApp:
                 if not api_key.strip():
                     return (
                         "❌ Please enter your Fireworks AI API key first",
-                        "Report will appear here after generation",
+                        "<p style='text-align: center; color: gray;'>PDF report will appear here after generation</p>",
                         gr.update(visible=False),
                         gr.update(visible=False),
                         gr.update(open=False),
@@ -379,32 +384,62 @@ class ClaimsAssistantApp:
                 try:
                     # Show processing status
                     yield (
-                        "🔄 Generating comprehensive claim report... Please wait",
-                        "Report will appear here after generation",
+                        "🔄 Generating comprehensive PDF claim report... Please wait",
+                        "<p style='text-align: center; color: gray;'>PDF report will appear here after generation</p>",
                         gr.update(visible=False),
                         gr.update(visible=False),
                         gr.update(open=False),
                     )
 
-                    # Generate the comprehensive report using the simplified claim processing
-                    self.final_report = generate_claim_report(
+                    # Generate the PDF report
+                    self.final_report_pdf = generate_claim_report_pdf(
                         damage_analysis=self.damage_analysis,
                         incident_data=self.incident_data,
                     )
 
-                    # Extract claim reference for download
-                    lines = self.final_report.split("\n")
-                    for line in lines:
-                        if line.startswith("**Claim Reference:**"):
-                            self.claim_reference = line.split("**Claim Reference:**")[
-                                1
-                            ].strip()
-                            break
+                    # Extract claim reference for download filename
+                    from datetime import datetime
+
+                    timestamp = datetime.now()
+                    self.claim_reference = f"CLM-{timestamp.strftime('%Y%m%d')}-{timestamp.strftime('%H%M%S')}"
+
+                    # Save PDF to temporary file for viewing and downloading
+                    if self.pdf_temp_path and os.path.exists(self.pdf_temp_path):
+                        os.remove(self.pdf_temp_path)
+
+                    temp_dir = tempfile.gettempdir()
+                    self.pdf_temp_path = os.path.join(
+                        temp_dir, f"{self.claim_reference}.pdf"
+                    )
+
+                    with open(self.pdf_temp_path, "wb") as f:
+                        f.write(self.final_report_pdf)
+
+                    # Create PDF viewer HTML
+                    pdf_base64 = base64.b64encode(self.final_report_pdf).decode("utf-8")
+                    pdf_viewer_html = f"""
+                    <div style="text-align: center; margin: 20px 0;">
+                        <h3 style="color: #2563eb;">📋 Insurance Claim Report - {self.claim_reference}</h3>
+                        <iframe
+                            src="data:application/pdf;base64,{pdf_base64}"
+                            width="100%"
+                            height="800px"
+                            style="border: 2px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                            <p>Your browser does not support PDF viewing.
+                            <a href="data:application/pdf;base64,{pdf_base64}" download="{self.claim_reference}.pdf">
+                                Click here to download the PDF
+                            </a></p>
+                        </iframe>
+                        <p style="margin-top: 15px; color: #6b7280; font-size: 14px;">
+                            📄 Professional PDF report generated successfully! Use the download button below to save.
+                        </p>
+                    </div>
+                    """
 
                     yield (
-                        "✅ Professional claim report generated successfully!",
-                        self.final_report,
-                        gr.update(visible=True),
+                        "✅ Professional PDF claim report generated successfully!",
+                        pdf_viewer_html,
+                        gr.update(visible=True, value=self.pdf_temp_path),
                         gr.update(visible=True),
                         gr.update(open=True),
                     )
@@ -412,8 +447,8 @@ class ClaimsAssistantApp:
 
                 except Exception as e:
                     yield (
-                        f"❌ Error generating report: {str(e)}",
-                        "Report will appear here after generation",
+                        f"❌ Error generating PDF report: {str(e)}",
+                        "<p style='text-align: center; color: red;'>Error generating PDF report</p>",
                         gr.update(visible=False),
                         gr.update(visible=False),
                         gr.update(open=False),
@@ -422,18 +457,19 @@ class ClaimsAssistantApp:
 
             def handle_claim_submission():
                 """Handle final claim submission"""
-                if not self.final_report:
+                if not self.final_report_pdf:
                     return "❌ No report available to submit"
 
                 return f"🎉 Claim submitted successfully! Reference: {self.claim_reference}"
 
-            def handle_download():
-                """Prepare report for download"""
-                if not self.final_report or not self.claim_reference:
-                    return None
-
-                # For demo purposes, just return the report content
-                return self.final_report
+            def cleanup_temp_files():
+                """Clean up temporary PDF files"""
+                if self.pdf_temp_path and os.path.exists(self.pdf_temp_path):
+                    try:
+                        os.remove(self.pdf_temp_path)
+                    except Exception as e:
+                        print(f"Error deleting temporary PDF file: {e}")
+                        pass
 
             # Wire up the events
             analyze_btn.click(
@@ -463,17 +499,17 @@ class ClaimsAssistantApp:
                 inputs=[api_key],
                 outputs=[
                     report_status,
-                    final_report,
+                    pdf_viewer,
                     download_btn,
                     submit_btn,
                     report_accordion,
                 ],
             )
 
-            # Set up download functionality
-            download_btn.click(fn=handle_download, outputs=[download_btn])
-
             submit_btn.click(fn=handle_claim_submission, outputs=[report_status])
+
+            # Clean up on app close
+            demo.load(lambda: None)
 
         return demo
 

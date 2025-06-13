@@ -1,13 +1,13 @@
 from pathlib import Path
 import gradio as gr
 import threading
-import time
 import queue
 import numpy as np
 
 from modules.image_analysis import pil_to_base64_dict, analyze_damage_image
 from modules.transcription import FireworksTranscription
 from modules.incident_processing import process_transcript_description
+from modules.claim_processing import generate_claim_report
 
 _FILE_PATH = Path(__file__).parents[1]
 
@@ -21,6 +21,8 @@ class ClaimsAssistantApp:
         self.is_recording = False
         self.transcription_service = None
         self.audio_queue = queue.Queue()
+        self.final_report = ""
+        self.claim_reference = ""
 
     def create_interface(self):
         """Create the main Gradio interface"""
@@ -355,6 +357,7 @@ class ClaimsAssistantApp:
                     return None
 
             def handle_report_generation(api_key):
+                """Generate comprehensive claim report using AI"""
                 if not self.damage_analysis or not self.incident_data:
                     return (
                         "❌ Please complete damage analysis and incident processing first",
@@ -374,79 +377,63 @@ class ClaimsAssistantApp:
                     )
 
                 try:
-                    # TODO: Use Fireworks to generate a comprehensive report
-                    # For now, create a detailed sample report
-                    transcription = self.incident_data.get("transcription", "N/A")
-
-                    report = f"""
-                        # Insurance Claim Report
-
-                        **Claim Reference**: CLM-2024-{int(time.time())}-001
-                        **Date Generated**: {time.strftime("%Y-%m-%d %H:%M:%S")}
-
-                        ---
-
-                        ## 🚗 Damage Analysis Summary
-
-                        - **Damage Type**: {self.damage_analysis.get('damage_type', 'N/A')}
-                        - **Severity Level**: {self.damage_analysis.get('severity', 'N/A')}
-                        - **Affected Areas**: {self.damage_analysis.get('affected_parts', 'N/A')}
-                        - **Estimated Repair Cost**: {self.damage_analysis.get('estimated_cost', 'N/A')}
-                        - **Additional Notes**: {self.damage_analysis.get('description', 'N/A')}
-
-                        ---
-
-                        ## 📝 Incident Summary
-
-                        - **Incident Date**: {self.incident_data.get('date', 'N/A')}
-                        - **Location**: {self.incident_data.get('location', 'N/A')}
-                        - **Incident Type**: {self.incident_data.get('incident_type', 'N/A')}
-                        - **Parties Involved**: {self.incident_data.get('parties_involved', 'N/A')}
-                        - **Weather Conditions**: {self.incident_data.get('weather_conditions', 'N/A')}
-                        - **Injuries Reported**: {"Yes" if self.incident_data.get('injuries_reported') else "No"}
-
-                        ### Incident Description (Live Transcription)
-                        *"{transcription[:500]}{'...' if len(transcription) > 500 else ''}"*
-
-                        ---
-
-                        ## 🔍 Assessment & Recommendations
-
-                        Based on the automated analysis of the damage photos and incident description:
-
-                        1. **Damage Assessment**: The vehicle shows {self.damage_analysis.get('severity', 'moderate')} damage
-                        2. **Claim Validity**: Initial assessment suggests this is a legitimate claim
-                        3. **Next Steps**:
-                           - Physical inspection recommended
-                           - Obtain additional documentation if needed
-                           - Process for repair authorization
-
-                        **Adjuster Notes**: This claim has been processed using AI assistance and requires human review for final approval.
-
-                        ---
-
-                        *This report was generated automatically using Fireworks AI technology*
-                        """
-
-                    return (
-                        "✅ Claim report generated successfully!",
-                        report,
-                        gr.update(visible=True),
-                        gr.update(visible=True),
-                        gr.update(open=True),
-                    )
-                except Exception as e:
-                    return (
-                        f"❌ Error generating report: {str(e)}",
+                    # Show processing status
+                    yield (
+                        "🔄 Generating comprehensive claim report... Please wait",
                         "Report will appear here after generation",
                         gr.update(visible=False),
                         gr.update(visible=False),
                         gr.update(open=False),
                     )
 
+                    # Generate the comprehensive report using the simplified claim processing
+                    self.final_report = generate_claim_report(
+                        damage_analysis=self.damage_analysis,
+                        incident_data=self.incident_data,
+                    )
+
+                    # Extract claim reference for download
+                    lines = self.final_report.split("\n")
+                    for line in lines:
+                        if line.startswith("**Claim Reference:**"):
+                            self.claim_reference = line.split("**Claim Reference:**")[
+                                1
+                            ].strip()
+                            break
+
+                    yield (
+                        "✅ Professional claim report generated successfully!",
+                        self.final_report,
+                        gr.update(visible=True),
+                        gr.update(visible=True),
+                        gr.update(open=True),
+                    )
+                    return None
+
+                except Exception as e:
+                    yield (
+                        f"❌ Error generating report: {str(e)}",
+                        "Report will appear here after generation",
+                        gr.update(visible=False),
+                        gr.update(visible=False),
+                        gr.update(open=False),
+                    )
+                    return None
+
             def handle_claim_submission():
-                claim_ref = f"CLM-2024-{int(time.time())}-001"
-                return f"🎉 Claim submitted successfully! Reference #: {claim_ref}"
+                """Handle final claim submission"""
+                if not self.final_report:
+                    return "❌ No report available to submit"
+
+                return f"🎉 Claim submitted successfully! Reference: {self.claim_reference}"
+
+            def handle_download():
+                """Prepare report for download"""
+                if not self.final_report or not self.claim_reference:
+                    return None
+
+                # For demo purposes, just return the report content
+                return self.final_report
 
             # Wire up the events
             analyze_btn.click(
@@ -482,6 +469,9 @@ class ClaimsAssistantApp:
                     report_accordion,
                 ],
             )
+
+            # Set up download functionality
+            download_btn.click(fn=handle_download, outputs=[download_btn])
 
             submit_btn.click(fn=handle_claim_submission, outputs=[report_status])
 

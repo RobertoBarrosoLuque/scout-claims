@@ -7,7 +7,9 @@ requires-python = ">=3.11"
 dependencies = [
     "gradio",
     "fireworks-ai",
-    "pre-commit"
+    "pre-commit",
+    "websocket",
+    "soundfile"
 ]
 
 [tool.setuptools.packages.find]

@@ -6,11 +6,15 @@ import numpy as np
 import base64
 import tempfile
 import os
+from dotenv import load_dotenv
 
 from modules.image_analysis import pil_to_base64_dict, analyze_damage_image
 from modules.transcription import FireworksTranscription
 from modules.incident_processing import process_transcript_description
 from modules.claim_processing import generate_claim_report_pdf
+
+
+load_dotenv()
 
 _FILE_PATH = Path(__file__).parents[1]
 
@@ -53,11 +57,14 @@ class ClaimsAssistantApp:
                     )
 
                     gr.Markdown("## ⚙️ Configuration")
+
+                    val = os.getenv("FIREWORKS_API_KEY", "")
+
                     api_key = gr.Textbox(
                         label="Fireworks AI API Key",
                         type="password",
                         placeholder="Enter your Fireworks AI API key",
-                        value="",
+                        value=val,
                         info="Required for AI processing",
                     )
 

@@ -12,7 +12,8 @@ dependencies = [
     "scipy>=1.11.0",
     "websocket-client",
     "torchaudio",
-    "reportlab"
+    "reportlab",
+    "python-dotenv"
 ]
 
 [tool.setuptools.packages.find]

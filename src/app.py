@@ -13,7 +13,6 @@ from modules.transcription import FireworksTranscription
 from modules.incident_processing import process_transcript_description
 from modules.claim_processing import generate_claim_report_pdf
 
-
 load_dotenv()
 
 _FILE_PATH = Path(__file__).parents[1]
@@ -32,6 +31,82 @@ class ClaimsAssistantApp:
         self.claim_reference = ""
         self.pdf_temp_path = None
 
+    @staticmethod
+    def format_function_calls_display(incident_data):
+        """Format function calls and external data for display"""
+        if not incident_data or "function_calls_made" not in incident_data:
+            return "", False
+
+        function_calls = incident_data.get("function_calls_made", [])
+        external_data = incident_data.get("external_data_retrieved", {})
+
+        if not function_calls:
+            return "", False
+
+        display_html = """
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white; padding: 20px; border-radius: 12px; margin: 15px 0;">
+            <h3 style="margin-top: 0; display: flex; align-items: center;">
+                <span style="margin-right: 10px;">🔧</span>
+                AI Function Calls Executed
+            </h3>
+            <p style="margin-bottom: 15px; opacity: 0.9;">
+                The AI automatically gathered additional context by calling external functions:
+            </p>
+        """
+
+        for i, call in enumerate(function_calls, 1):
+            status_icon = "✅" if call["status"] == "success" else "❌"
+            function_name = call["function_name"]
+
+            display_html += f"""
+            <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
+                <h4 style="margin: 0 0 10px 0;">
+                    {status_icon} {i}. {function_name.replace('_', ' ').title()}
+                </h4>
+                <p style="margin: 5px 0; opacity: 0.8; font-size: 14px;">
+                    Status: {call['status'].title()} - {call['message']}
+                </p>
+            """
+
+            if call["status"] == "success" and function_name in external_data:
+                result = external_data[function_name]
+
+                if function_name == "weather_lookup":
+                    display_html += f"""
+                    <div style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 5px;">
+                        <strong>Weather Conditions:</strong><br/>
+                        🌡️ Temperature: {result.get('temperature', 'N/A')}<br/>
+                        ☁️ Conditions: {result.get('conditions', 'N/A')}<br/>
+                        👁️ Visibility: {result.get('visibility', 'N/A')}<br/>
+                        🌧️ Precipitation: {result.get('precipitation', 'N/A')}
+                    </div>
+                    """
+
+                elif function_name == "driver_record_check":
+                    display_html += f"""
+                    <div style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 5px;">
+                        <strong>Driver Record:</strong><br/>
+                        🆔 License: {result.get('license_status', 'N/A')}<br/>
+                        🛡️ Insurance: {result.get('insurance_status', 'N/A')}<br/>
+                        📊 Risk Level: {result.get('risk_assessment', 'N/A')}<br/>
+                        📝 Previous Claims: {result.get('previous_claims', 0)}
+                    </div>
+                    """
+
+            display_html += "</div>"
+
+        display_html += """
+            <div style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 5px;">
+                <small style="opacity: 0.8;">
+                    💡 This additional context helps provide more accurate claim assessment and risk evaluation.
+                </small>
+            </div>
+        </div>
+        """
+
+        return display_html, True
+
     def create_interface(self):
         """Create the main Gradio interface"""
 
@@ -40,7 +115,9 @@ class ClaimsAssistantApp:
             with gr.Row():
                 with gr.Column():
                     gr.Markdown("# 🚗 Scout | AI Claims Assistant 🚗")
-                    gr.Markdown("*Automated Insurance Claims Processing*")
+                    gr.Markdown(
+                        "*Automated Insurance Claims Processing with AI Function Calling*"
+                    )
 
             # Sidebar (API Key)
             with gr.Row():
@@ -75,7 +152,7 @@ class ClaimsAssistantApp:
                     **Step 2:** Use microphone to describe incident
                     **Step 3:** Generate and review claim report
 
-                    *All processing happens automatically via FireworksAI*
+                    *🔧 NEW: AI automatically calls external functions to gather additional context like weather data and driver records!*
                     """
                     )
 
@@ -164,6 +241,11 @@ class ClaimsAssistantApp:
                         value="Record audio first to process incident",
                         interactive=False,
                         lines=2,
+                    )
+
+                    # NEW: Function calls display
+                    function_calls_display = gr.HTML(
+                        label="AI Function Calls", visible=False
                     )
 
                     # Incident Processing Results
@@ -327,10 +409,11 @@ class ClaimsAssistantApp:
                     return self.live_transcription
 
             def handle_incident_processing(api_key):
-                """Process the recorded transcription into structured incident data"""
+                """Process the recorded transcription into structured incident data with function calling"""
                 if not self.live_transcription.strip():
                     return (
                         "❌ No transcription available. Please record audio first.",
+                        gr.update(visible=False),
                         gr.update(visible=False),
                     )
 
@@ -338,16 +421,18 @@ class ClaimsAssistantApp:
                     return (
                         "❌ Please enter your Fireworks AI API key first",
                         gr.update(visible=False),
+                        gr.update(visible=False),
                     )
 
                 try:
                     # Update status
                     yield (
-                        "🔄 Processing incident data... Please wait",
+                        "🔄 Processing incident data ... Please wait",
+                        gr.update(visible=False),
                         gr.update(visible=False),
                     )
 
-                    # Use Fireworks to process the transcription and extract structured data
+                    # Use enhanced Fireworks processing with function calling
                     incident_analysis = process_transcript_description(
                         transcript=self.live_transcription, api_key=api_key
                     )
@@ -355,8 +440,22 @@ class ClaimsAssistantApp:
                     # Convert Pydantic model to dict for JSON display
                     self.incident_data = incident_analysis.model_dump()
 
+                    # Format function calls for display
+                    function_calls_html, show_calls = (
+                        self.format_function_calls_display(self.incident_data)
+                    )
+
+                    # Update status message based on function calls
+                    if show_calls:
+                        status_message = f"✅ Incident processing completed with {len(self.incident_data.get('function_calls_made', []))} AI function calls!"
+                    else:
+                        status_message = (
+                            "✅ Incident processing completed successfully!"
+                        )
+
                     yield (
-                        "✅ Incident processing completed successfully!",
+                        status_message,
+                        gr.update(value=function_calls_html, visible=show_calls),
                         gr.update(value=self.incident_data, visible=True),
                     )
                     return None
@@ -364,6 +463,7 @@ class ClaimsAssistantApp:
                 except Exception as e:
                     yield (
                         f"❌ Error processing incident: {str(e)}",
+                        gr.update(visible=False),
                         gr.update(visible=False),
                     )
                     return None
@@ -495,10 +595,11 @@ class ClaimsAssistantApp:
                 show_progress="hidden",
             )
 
+            # Updated to include function calls display
             process_incident_btn.click(
                 fn=handle_incident_processing,
                 inputs=[api_key],
-                outputs=[incident_status, incident_results],
+                outputs=[incident_status, function_calls_display, incident_results],
             )
 
             generate_report_btn.click(
@@ -529,6 +630,6 @@ def create_claims_app():
 
 # Create and launch the demo
 if __name__ == "__main__":
-    print("Starting AI Claims Assistant Demo")
+    print("Starting AI Claims Assistant Demo with Function Calling")
     demo = create_claims_app()
     demo.launch()

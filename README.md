@@ -124,24 +124,4 @@ This autonomous approach means **no manual intervention required** - the AI inte
 - Generates comprehensive PDF claim report
 - Download or submit directly
 
-## System Workflow
-
-```mermaid
-graph TD
-    A[Upload Damage Photo] --> B[Fireworks Vision Analysis]
-    B --> C[Record Incident Audio]
-    C --> D[Fireworks Speech-to-Text]
-    D --> E[Fireworks NLP Processing]
-    E --> F{AI Function Calling Decision}
-    F -->|Weather Data Needed| G[Call weather_lookup()]
-    F -->|Driver Record Needed| H[Call driver_record_check()]
-    F -->|No Additional Data| I[Continue Processing]
-    G --> J[Integrate External Data]
-    H --> J
-    I --> J
-    J --> K[Generate PDF Report]
-    K --> L[Download/Submit Claim]
-```
-
-
 **Powered by Fireworks AI** | **Built for intelligent claims processing**

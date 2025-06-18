@@ -238,6 +238,7 @@ def process_transcript_description(transcript: str, api_key: str):
     function_calls_to_make = []
     external_data = {}
 
+    # Hybrid Approach: AI + Rule-Based function calling
     if (
         incident_data.date_location.date
         and incident_data.date_location.location

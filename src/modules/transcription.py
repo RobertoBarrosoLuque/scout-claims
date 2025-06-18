@@ -28,28 +28,6 @@ class FireworksTranscription:
         """Set callback to receive live transcription updates."""
         self.transcription_callback = callback
 
-    def transcribe_audio_file(self, audio_file_path: str) -> str:
-        """Transcribe audio file and return final result."""
-        if not self._connect():
-            raise Exception("Failed to connect to Fireworks transcription service")
-
-        try:
-            # Process and stream the audio file
-            self._stream_audio_file(audio_file_path)
-
-            # Wait for completion (max 30 seconds)
-            timeout = 30
-            start_time = time.time()
-            while self.is_connected and (time.time() - start_time) < timeout:
-                time.sleep(0.1)
-
-            # Get final transcription
-            final_text = self._get_final_text()
-            return final_text
-
-        finally:
-            self._disconnect()
-
     def _connect(self) -> bool:
         """Connect to Fireworks WebSocket."""
         try:

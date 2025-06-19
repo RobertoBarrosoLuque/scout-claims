@@ -26,13 +26,19 @@ vision_damage_analysis:
     - **back-left**: Driver side rear (trunk, rear bumper, taillight, driver door rear portion)
     - **back-right**: Passenger side rear (trunk, rear bumper, taillight, passenger door rear portion)
 
+    **Licence Plate Extraction:**
+    - If the licence plate is present, please extract it and provide it in the response.
+    - Make sure to provide the full plate number and any relevant characters (e.g., dashes, spaces, etc.).
+    - If the licence plate is not present, please provide "N/A" in the response.
+
     **INSTRUCTIONS:**
     1. Examine the entire visible vehicle surface
     2. Identify the primary damage location using the quadrant system
     3. Assess severity based on size, depth, and functional impact
-    4. Provide a clear, detailed description of what you observe
-    5. If damage spans multiple quadrants, choose the most severely affected area
-    6. Be conservative in estimates - when uncertain, classify as higher severity
+    4. Provide the license plate number if present
+    5. Provide a clear, detailed description of what you observe
+    6. If damage spans multiple quadrants, choose the most severely affected area
+    7. Be conservative in estimates - when uncertain, classify as higher severity
 
     Focus on accuracy and consistency. This analysis will be used for insurance claim processing.
 

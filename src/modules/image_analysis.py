@@ -14,6 +14,7 @@ class IncidentAnalysis(BaseModel):
     description: str
     location: Literal["front-left", "front-right", "back-left", "back-right"]
     severity: Literal["minor", "moderate", "major"]
+    license_plate: str
 
 
 def get_llm(api_key: str, model: str, temperature: float) -> LLM:

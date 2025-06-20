@@ -238,7 +238,7 @@ def process_transcript_description(transcript: str, api_key: str):
     function_calls_to_make = []
     external_data = {}
 
-    # Hybrid Approach: AI + Rule-Based function calling
+    # Making it more robust by checking for necessary inputs
     if (
         incident_data.date_location.date
         and incident_data.date_location.location
@@ -270,6 +270,7 @@ def process_transcript_description(transcript: str, api_key: str):
             }
         )
 
+    # Execute tool calls
     function_results = []
     if function_calls_to_make:
         print(f"Executing {len(function_calls_to_make)} function calls...")
@@ -285,6 +286,7 @@ def process_transcript_description(transcript: str, api_key: str):
     incident_data.function_calls_made = function_results
     incident_data.external_data_retrieved = external_data
 
+    # Update analysis with external data pulled from tools
     if function_results:
         print("Incorporating external data into final analysis...")
 

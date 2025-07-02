@@ -13,7 +13,9 @@ dependencies = [
     "websocket-client",
     "torchaudio",
     "reportlab",
-    "python-dotenv"
+    "python-dotenv",
+    "jupyter",
+    "ipython",
 ]
 
 [tool.setuptools.packages.find]

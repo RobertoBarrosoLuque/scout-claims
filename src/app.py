@@ -148,11 +148,9 @@ class ClaimsAssistantApp:
                     gr.Markdown("## 📋 Instructions")
                     gr.Markdown(
                         """
-                    **Step 1:** Upload car damage photo(s)
-                    **Step 2:** Use microphone to describe incident
-                    **Step 3:** Generate and review claim report
-
-                    *🔧 NEW: AI automatically calls external functions to gather additional context like weather data and driver records!*
+                    **Step 1:** Upload car damage photo(s) \n
+                    **Step 2:** Use microphone to describe incident \n
+                    **Step 3:** Generate and review claim report \n
                     """
                     )
 
